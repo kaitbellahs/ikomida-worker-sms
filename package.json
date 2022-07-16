@@ -1,0 +1,17 @@
+{
+    "name": "ikomida-sms-worker",
+    "version": "1.0.0",
+    "description": "ikomida push sms worker",
+    "main": "src/worker.mjs",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "worker": "node src/worker.mjs"
+    },
+    "author": "Khalid Ait Bellahs",
+    "license": "UNLICENSED",
+    "dependencies": {
+        "axios": "^0.26.0",
+        "ikomida-shared": "github:TIAltoNivel/ikomida-shared#main",
+        "uuid": "^8.3.2"
+    }
+}
