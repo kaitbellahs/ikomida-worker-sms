@@ -2,8 +2,6 @@
 
 import {
     RabbitMQ,
-    MariaDB,
-    GoogleAdmin,
     objHasProp,
     GateWays,
     Logger
@@ -23,27 +21,31 @@ name = name
     .replace(/^(@\S+\/)?(svelte-)?(\S+)/, '$3')
     .replace(/^\w/, m => m.toUpperCase())
     .replace(/-\w/g, m => m[1].toUpperCase());
-const logger = Logger.getInstance(name, process.env?.ENV !== 'PROD');
 
 class SMSWorker {
 
-    amqp;
-    provider;
+    amqp
+    provider
+    logger
+
+    constructor(){
+        this.logger = Logger.getInstance(name, process.env?.ENV !== 'PROD')
+    }
 
     //TODO: -- report errors
     async run() {
         try {
-            this.provider = new GateWays.OtimaTel(name);
-            this.amqp = new RabbitMQ(logger);
+            this.provider = new GateWays.OtimaTel(this.logger);
+            this.amqp = new RabbitMQ(this.logger);
             await this.amqp.listenToMessages(RabbitMQ.SMS_SEVERITY, this.processMessages.bind(this));
         } catch (error) {
-            console.error(error);
+            this.logger.error(error);
         }
     }
 
     async processMessages(message, channel) {
         try {
-            console.log(" [x] %s: message received: '%s'", message.fields.routingKey, message.content.toString('utf8'));
+            this.logger.log(" [x] %s: message received: '%s'", message.fields.routingKey, message.content.toString('utf8'));
             const messageObject = JSON.parse(message.content.toString('utf8'));
             if (messageObject.method === 'send') {
                 for (let i = 1; i < 4; i++) {
@@ -54,7 +56,7 @@ class SMSWorker {
                 }
             }
         } catch (error) {
-            console.error(error);
+            this.logger.error(error);
         } finally {
             channel.ack(message);
         }
@@ -62,13 +64,13 @@ class SMSWorker {
 
     async sendSMS(object) {
         if (!this.validateObject(object)) {
-            console.error("object have not suficiente params");
+            this.logger.error("object have not suficiente params");
             return false;
         }
         const id = uuidV4();
-        console.log(id, `+${object?.areaCode}${object?.phone}, ${object?.message?.message}`);
+        this.logger.log(id, `+${object?.areaCode}${object?.phone}, ${object?.message?.message}`);
         const response = await this.provider.send(object?.areaCode, object?.phone, object?.message?.message, id);
-        console.log(response)
+        this.logger.log(response)
         return true;
     }
 
