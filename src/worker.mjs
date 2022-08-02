@@ -48,7 +48,7 @@ class SMSWorker {
             const messageObject = JSON.parse(message.content.toString('utf8'))
             if (messageObject.method === 'send') {
                 for (let i = 1; i < 4; i++) {
-                    if (this.sendSMS(messageObject?.object)) {
+                    if (await this.sendSMS(messageObject?.object)) {
                         break;
                     }
                     await this.sleep(i * 1000)
