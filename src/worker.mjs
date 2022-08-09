@@ -4,7 +4,8 @@ import {
     RabbitMQ,
     objHasProp,
     GateWays,
-    Logger
+    Logger,
+    System
 } from 'ikomida-shared';
 import {
     v4 as uuidV4
@@ -28,7 +29,7 @@ class SMSWorker {
     provider
     logger
 
-    constructor(){
+    constructor() {
         this.logger = Logger.getInstance(name, process.env?.ENV !== 'PROD')
     }
 
@@ -36,7 +37,7 @@ class SMSWorker {
         try {
             this.provider = new GateWays.OtimaTel(this.logger)
             this.amqp = new RabbitMQ(this.logger)
-            await this.amqp.listenToMessages(RabbitMQ.SMS_SEVERITY, this.processMessages.bind(this))
+            await this.amqp.listenToMessages(RabbitMQ.SMS_QUEUE, this.processMessages.bind(this))
         } catch (error) {
             this.logger.error(error)
         }
@@ -51,7 +52,7 @@ class SMSWorker {
                     if (await this.sendSMS(messageObject?.object)) {
                         break;
                     }
-                    await this.sleep(i * 1000)
+                    await System.sleep(i * 1000)
                 }
             }
         } catch (error) {
@@ -71,10 +72,6 @@ class SMSWorker {
         const response = await this.provider.send(object?.areaCode, object?.phone, object?.message?.message, id)
         this.logger.log(response)
         return true;
-    }
-
-    async sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms))
     }
 
     validateObject(object) {
