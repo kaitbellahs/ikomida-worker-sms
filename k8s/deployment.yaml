@@ -6,7 +6,7 @@ metadata:
   name: sms-worker
   namespace: ikomida-worker
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: sms
@@ -25,6 +25,11 @@ spec:
           name: sms-worker
           securityContext:
             allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - all
+            privileged: false
+            readOnlyRootFilesystem: true
           env:
             - name: ENV
               value: "PROD"
