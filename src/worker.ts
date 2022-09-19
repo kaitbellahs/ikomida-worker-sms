@@ -39,10 +39,10 @@ class SMSWorker {
     async processMessages(message: Message, channel: Channel) {
         try {
             this.logger.log(` [x] ${message.fields.routingKey}: message received: '${message.content.toString('utf8')}'`)
-            const messageObject = JSON.parse(message.content.toString('utf8')) as Types.Interfaces.IAMQPPayload<Types.Interfaces.IAMQPPayloadObject>
+            const messageObject: Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject> = Types.Classes.CAMQPPayload.fromObject(JSON.parse(message.content.toString('utf8')))
             if (messageObject.method === 'send') {
                 for (let i = 1; i < 4; i++) {
-                    if (await this.sendSMS(messageObject?.object as Types.Interfaces.IAMQPPayloadObject)) {
+                    if (await this.sendSMS(Types.Classes.CAMQPPayloadObject.fromObject(messageObject?.object))) {
                         break;
                     }
                     await Utils.System.sleep(i * 1000)
@@ -55,7 +55,7 @@ class SMSWorker {
         }
     }
 
-    async sendSMS(object: Types.Interfaces.IAMQPPayloadObject) {
+    async sendSMS(object: Types.Classes.CAMQPPayloadObject) {
         if (!this.validateObject(object)) {
             this.logger.error("object have not suficiente params")
             return false;
@@ -67,7 +67,7 @@ class SMSWorker {
         return true;
     }
 
-    validateObject(object: Types.Interfaces.IAMQPPayloadObject) {
+    validateObject(object: Types.Classes.CAMQPPayloadObject) {
         return objHasProp(["areaCode", "phone", "message"], object) && objHasProp(["message"], object?.message)
     }
 }
