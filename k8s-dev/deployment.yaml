@@ -19,8 +19,8 @@ spec:
         - image: hub.docker.internal:5000/ikomida/sms-worker-image:latest
           name: sms-worker
           env:
-            - name: ENV
-              value: "DEV"
+            - name: NODE_ENV
+              value: "development"
             - name: OTIMATELUSER
               valueFrom:
                 secretKeyRef:
