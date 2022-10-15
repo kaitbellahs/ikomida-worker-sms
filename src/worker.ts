@@ -1,3 +1,9 @@
+import crypto from 'crypto'
+Object.defineProperty(global, 'crypto', {
+  value: {
+    getRandomValues: (arr: any) => crypto.randomBytes(arr.length)
+  }
+})
 import { v4 as uuidV4 } from 'uuid'
 import { createRequire } from 'module'
 import { GateWays, Domain, Utils, Types, objHasProp } from '@ikomida/shared-backend'
@@ -42,6 +48,7 @@ class SMSWorker {
           await Utils.System.sleep(i * 1000)
         }
       }
+      channel.ack(message)
     } catch (error: any) {
       this.logger.error(error)
     }
