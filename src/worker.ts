@@ -1,75 +1,80 @@
-import {
-    v4 as uuidV4
-} from 'uuid'
-import {
-    createRequire
-} from "module";
-import { GateWays, Domain, Utils, Types, objHasProp } from '@ikomida/shared-backend';
-import { Channel, Message } from 'amqplib';
-const require = createRequire(
-    import.meta.url)
-let {
-    name
-} = require("../package.json")
+import crypto from 'crypto'
+Object.defineProperty(global, 'crypto', {
+  value: {
+    getRandomValues: (arr: any) => crypto.randomBytes(arr.length)
+  }
+})
+import { v4 as uuidV4 } from 'uuid'
+import { createRequire } from 'module'
+import { GateWays, Domain, Utils, Types, objHasProp } from '@ikomida/shared-backend'
+import { Channel, Message } from 'amqplib'
+const require = createRequire(import.meta.url)
+let { name } = require('../package.json')
 name = name
-    .replace(/^(@\S+\/)?(svelte-)?(\S+)/, '$3')
-    .replace(/^\w/, (m: string) => m.toUpperCase())
-    .replace(/-\w/g, (m: string[]) => m[1].toUpperCase())
+  .replace(/^(@\S+\/)?(svelte-)?(\S+)/, '$3')
+  .replace(/^\w/, (m: string) => m.toUpperCase())
+  .replace(/-\w/g, (m: string[]) => m[1].toUpperCase())
 
 class SMSWorker {
+  amqp?: Domain.RabbitMQ
+  provider?: GateWays.OtimaTel
+  logger: Utils.Logger
 
-    amqp?: Domain.RabbitMQ
-    provider?: GateWays.OtimaTel
-    logger: Utils.Logger
+  constructor() {
+    this.logger = Utils.Logger.getInstance(name)
+  }
 
-    constructor() {
-        this.logger = Utils.Logger.getInstance(name)
+  async run() {
+    try {
+      this.provider = new GateWays.OtimaTel(this.logger)
+      this.amqp = new Domain.RabbitMQ(this.logger)
+      await this.amqp.listenToMessages(Domain.RabbitMQ.SMS_QUEUE, this.processMessages.bind(this))
+    } catch (error: any) {
+      this.logger.error(error)
     }
+  }
 
-    async run() {
-        try {
-            this.provider = new GateWays.OtimaTel(this.logger)
-            this.amqp = new Domain.RabbitMQ(this.logger)
-            await this.amqp.listenToMessages(Domain.RabbitMQ.SMS_QUEUE, this.processMessages.bind(this))
-        } catch (error: any) {
-            this.logger.error(error)
-        }
-    }
-
-    async processMessages(message: Message, channel: Channel) {
-        try {
-            this.logger.log(` [x] ${message.fields.routingKey}: message received: '${message.content.toString('utf8')}'`)
-            const messageObject: Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject> = Types.Classes.CAMQPPayload.fromObject(JSON.parse(message.content.toString('utf8')))
-            if (messageObject.method === 'send') {
-                for (let i = 1; i < 4; i++) {
-                    if (await this.sendSMS(Types.Classes.CAMQPPayloadObject.fromObject(messageObject?.object))) {
-                        break;
-                    }
-                    await Utils.System.sleep(i * 1000)
-                }
-            }
-        } catch (error: any) {
-            this.logger.error(error)
-        } finally {
+  async processMessages(message: Message, channel: Channel) {
+    try {
+      this.logger.log(` [x] ${message.fields.routingKey}: message received: '${message.content.toString('utf8')}'`)
+      const messageObject: Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject> =
+        Types.Classes.CAMQPPayload.fromObject(JSON.parse(message.content.toString('utf8')))
+      if (messageObject.method === 'send') {
+        for (let i = 1; i < 4; i++) {
+          if (await this.sendSMS(Types.Classes.CAMQPPayloadObject.fromObject(messageObject?.object))) {
             channel.ack(message)
+            return true
+          }
+          await Utils.System.sleep(i * 1000)
         }
+      }
+      channel.ack(message)
+    } catch (error: any) {
+      this.logger.error(error)
     }
+    channel.nack(message)
+  }
 
-    async sendSMS(object: Types.Classes.CAMQPPayloadObject) {
-        if (!this.validateObject(object)) {
-            this.logger.error("object have not suficiente params")
-            return false;
-        }
-        const id = uuidV4()
-        this.logger.log(id, `+${object?.areaCode}${object.phone}, ${object.message?.message}`)
-        const response = await this.provider?.send(Number(object.areaCode), Number(object.phone), object.message?.message, id)
-        this.logger.log(response)
-        return true;
+  async sendSMS(object: Types.Classes.CAMQPPayloadObject) {
+    if (!this.validateObject(object)) {
+      this.logger.error('object have not suficiente params')
+      return false
     }
+    const id = uuidV4()
+    this.logger.log(id, `+${object?.areaCode}${object.phone}, ${object.message?.message}`)
+    const response = await this.provider?.send(
+      Number(object.areaCode),
+      Number(object.phone),
+      object.message?.message,
+      id
+    )
+    this.logger.log(response)
+    return true
+  }
 
-    validateObject(object: Types.Classes.CAMQPPayloadObject) {
-        return objHasProp(["areaCode", "phone", "message"], object) && objHasProp(["message"], object?.message)
-    }
+  validateObject(object: Types.Classes.CAMQPPayloadObject) {
+    return objHasProp(['areaCode', 'phone', 'message'], object) && objHasProp(['message'], object?.message)
+  }
 }
 
-await (new SMSWorker).run()
+await new SMSWorker().run()
